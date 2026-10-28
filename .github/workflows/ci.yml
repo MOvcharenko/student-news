@@ -1,0 +1,148 @@
+name: CI
+
+# The fast feedback pipeline: it runs on every push and every pull request,
+# and it is deliberately ordered cheapest-check-first. Lint and unit tests take
+# seconds; building a container image takes minutes; the end-to-end suite takes
+# longer still and lives in its own workflow.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# A second push to the same branch cancels the run still in progress, so the
+# queue never fills with results nobody is waiting for any more.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------- stage 0
+  # The cheapest check there is: no compile, no container, seconds to run.
+  # If this fails there is no point starting anything else.
+  frontend-lint:
+    name: Frontend · lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+  # ---------------------------------------------------------------- stage 1
+  backend-test:
+    name: Backend · unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven            # without this, Maven re-downloads the world every run
+
+      # -B is batch mode (no colour codes in the log) and surefire runs the unit
+      # tests only. The integration tests need a database, so they are excluded
+      # here and covered by the E2E workflow instead.
+      - name: Run unit tests
+        working-directory: backend
+        run: mvn -B test -Dtest='!*IntegrationTest,!*E2ETest'
+
+      # Published even when the step above fails — a red run you cannot inspect
+      # is not much use.
+      - name: Publish test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: backend/target/surefire-reports/
+          retention-days: 7
+
+  # ---------------------------------------------------------------- stage 1
+  frontend-build:
+    name: Frontend · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # npm ci installs exactly what the lock file pins. npm install may silently
+      # resolve to newer versions, which is how a build passes locally and fails here.
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7
+
+  # ---------------------------------------------------------------- stage 2
+  # Packaging only runs once both stage-1 jobs are green. There is no point
+  # spending minutes building images for code whose tests already failed.
+  package:
+    name: Package · container images
+    needs: [frontend-lint, backend-test, frontend-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Built but not pushed: this proves the Dockerfile is valid on every change,
+      # without needing registry credentials. Pushing is the Deploy stage, and that
+      # is what the Final Project adds.
+      - name: Build ${{ matrix.service }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          push: false
+          tags: student-news-${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------- summary
+  # One job the branch protection rule can point at, instead of listing every
+  # job above and updating the rule each time the pipeline changes.
+  ci-status:
+    name: CI status
+    if: always()
+    needs: [frontend-lint, backend-test, frontend-build, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any stage failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more CI stages did not pass."
+          exit 1
+      - name: All stages passed
+        run: echo "Build, test and package all green."

@@ -1,0 +1,84 @@
+name: Deploy (dry run)
+
+# The Deploy stage of the pipeline, deliberately stopping short of deploying
+# anything. It exists so the shape is visible: a manual trigger, a chosen
+# environment, and a gate that only green code can pass through.
+#
+# Week 10 covers Build, Test and Package. Deploying for real — to Kubernetes,
+# with a rolling update — is the Final Project.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        default: staging
+      image_tag:
+        description: Image tag to deploy (defaults to the current commit)
+        type: string
+        required: false
+
+concurrency:
+  # One deployment per environment at a time. Two overlapping rollouts is how
+  # an environment ends up in a state nobody can describe.
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: resolve
+        run: |
+          TAG="${{ inputs.image_tag }}"
+          [ -z "$TAG" ] && TAG="${GITHUB_SHA::7}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Would deploy tag: $TAG"
+
+      # Deploying a commit whose tests never passed is the failure mode this
+      # check exists to prevent. In a real pipeline this would query the
+      # deployment API or require a protected environment reviewer.
+      - name: Confirm CI passed for this commit
+        run: |
+          echo "Commit:      $GITHUB_SHA"
+          echo "Environment: ${{ inputs.environment }}"
+          echo
+          echo "In a real pipeline this step would refuse to continue unless"
+          echo "the CI workflow for this exact commit finished successfully."
+
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    needs: plan
+    runs-on: ubuntu-latest
+    # A GitHub Environment can carry required reviewers and secrets. Create one
+    # named 'staging' / 'production' in repo settings to see the approval gate.
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Show what a deployment would do
+        run: |
+          echo "=== DRY RUN — nothing is actually deployed ==="
+          echo
+          echo "Target:    ${{ inputs.environment }}"
+          echo "Image tag: ${{ needs.plan.outputs.tag }}"
+          echo
+          echo "A real deployment at this point would:"
+          echo "  1. push student-news-backend and student-news-frontend to a registry"
+          echo "  2. update the running workload to the new tag"
+          echo "  3. wait for health checks to pass before shifting traffic"
+          echo "  4. roll back automatically if they do not"
+          echo
+          echo "Steps 2-4 are Kubernetes rolling updates — Week 14."
+
+      - name: Smoke test placeholder
+        run: |
+          echo "A smoke test runs here: one request against the deployed"
+          echo "environment proving the new version answers before the"
+          echo "deployment is declared successful."

@@ -1,5 +1,8 @@
 # Student News Demo
 
+[![CI](https://github.com/rtym/student-news/actions/workflows/ci.yml/badge.svg)](https://github.com/rtym/student-news/actions/workflows/ci.yml)
+[![E2E (Playwright)](https://github.com/rtym/student-news/actions/workflows/e2e.yml/badge.svg)](https://github.com/rtym/student-news/actions/workflows/e2e.yml)
+
 Demo application for managing student news without authentication.
 
 Supported operations:
