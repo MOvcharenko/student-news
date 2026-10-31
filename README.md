@@ -1,4 +1,4 @@
-Trivial commit check
+Checking for selectiveness
 
 # Student News Demo
 
