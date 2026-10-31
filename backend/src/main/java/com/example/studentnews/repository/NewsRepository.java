@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface NewsRepository extends JpaRepository<NewsItem, Long> {
-    List<NewsItem> findAllByStatusOrderByPoopdatedAtDesc(NewsStatus status);
+    List<NewsItem> findAllByStatusOrderByUpdatedAtDesc(NewsStatus status);
 }
