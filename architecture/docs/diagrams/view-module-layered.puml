@@ -1,0 +1,67 @@
+@startuml view-module-layered
+!include plantuml-theme.puml
+title Layered / uses — backend API classes (UML class diagram)
+hide empty members
+package "web layer" {
+  class NewsController <<RestController>> {
+    +list(status : NewsStatus) : List<NewsResponse>
+    +create(request : NewsRequest) : NewsResponse
+    +update(id : Long, request : NewsRequest) : NewsResponse
+    +publish(id : Long) : NewsResponse
+    +archive(id : Long) : NewsResponse
+    +delete(id : Long)
+  }
+  class NewsRequest <<record>> {
+    +title : String {NotBlank, max 255}
+    +content : String {NotBlank}
+  }
+  class NewsResponse <<record>> {
+    +id : Long
+    +title : String
+    +content : String
+    +status : NewsStatus
+    +createdAt : Instant
+    +updatedAt : Instant
+  }
+}
+package "service layer" {
+  class NewsService <<Service>> {
+    +list(status : NewsStatus) : List<NewsResponse>
+    +create(request : NewsRequest) : NewsResponse
+    +update(id : Long, request : NewsRequest) : NewsResponse
+    +publish(id : Long) : NewsResponse
+    +archive(id : Long) : NewsResponse
+    +delete(id : Long)
+  }
+  class NotFoundException <<RuntimeException>>
+}
+package "persistence layer" {
+  interface NewsRepository <<Spring Data JPA>> {
+    +findAllByStatusOrderByUpdatedAtDesc(status : NewsStatus) : List<NewsItem>
+  }
+  class NewsItem <<Entity: news_items>> {
+    -id : Long
+    -title : String
+    -content : String
+    -status : NewsStatus
+    -createdAt : Instant
+    -updatedAt : Instant
+    +onCreate() <<PrePersist>>
+    +onUpdate() <<PreUpdate>>
+  }
+  enum NewsStatus {
+    DRAFT
+    PUBLISHED
+    ARCHIVED
+  }
+}
+NewsController ..> NewsRequest : validates (@Valid)
+NewsController ..> NewsResponse : returns
+NewsRequest -[hidden]down- NewsService
+NewsResponse -[hidden]down- NewsService
+NewsController ..> NewsService : <<use>>\ndelegates every operation
+NewsService .right.> NotFoundException : throws for unknown id
+NewsService ..> NewsRepository : <<use>>\nloads and saves
+NewsRepository ..> NewsItem : persists
+NewsItem -right-> "1" NewsStatus : status
+@enduml

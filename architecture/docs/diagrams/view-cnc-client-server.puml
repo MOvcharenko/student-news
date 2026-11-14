@@ -1,0 +1,26 @@
+@startuml view-cnc-client-server
+!include plantuml-theme.puml
+left to right direction
+title Runtime — client-server components and connectors (UML component diagram)
+actor "Demo user" as user
+actor "API developer" as dev
+component "Web UI\n(React 19 SPA,\nruns in the browser)" as spa
+component "Static web server\n(nginx-unprivileged 1.31)" as web
+component "News API process\n(Spring Boot 4, Java 27)" as apiproc {
+  component "News API\n(Spring MVC,\nspringdoc)" as api
+  component "Schema migrator\n(Flyway, at startup)" as flyway
+}
+database "News database\n(PostgreSQL 16)" as db
+interface "REST /api/news\n(JSON over HTTP)" as rest
+interface "OpenAPI /v3/api-docs\nand Swagger UI" as docs
+interface "JDBC / SQL" as jdbc
+user --> spa : uses in a browser
+spa --> web : downloads index.html\nand the JS bundle (HTTP)
+api -up- rest
+api -up- docs
+spa ..> rest : calls (cross-origin, CORS)
+dev ..> docs : reads and tries out
+db - jdbc
+api ..> jdbc : reads and writes news_items
+flyway ..> jdbc : applies V1 schema
+@enduml

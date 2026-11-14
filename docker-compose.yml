@@ -3,15 +3,25 @@ services:
     image: postgres:16-alpine
     container_name: student-news-db
     environment:
-      POSTGRES_DB: student_news
-      POSTGRES_USER: student
-      POSTGRES_PASSWORD: student
+      # Defaults apply when no .env file is present (CI, first run); see
+      # .env.example. Postgres reads these only when the volume is first
+      # created, so after changing them run `docker compose down -v`.
+      POSTGRES_DB: ${POSTGRES_DB:-student_news}
+      POSTGRES_USER: ${POSTGRES_USER:-student}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-student}
     ports:
-      - "5432:5432"
+      # Not needed by the backend container (it uses db:5432 on the Compose
+      # network) or by any test. Published for local development: a backend
+      # run from the IDE or `mvn spring-boot:run` connects to localhost:5432
+      # (the default in application.properties), as can a database client.
+      # Bound to 127.0.0.1 so the demo credentials are not reachable from the
+      # network.
+      - "127.0.0.1:5433:5432" #different port here to avoid conflict on my device
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U student -d student_news"]
+      # $$ leaves expansion to the container, which has the variables above.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -21,9 +31,11 @@ services:
       context: ./backend
     container_name: student-news-backend
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/student_news
-      SPRING_DATASOURCE_USERNAME: student
-      SPRING_DATASOURCE_PASSWORD: student
+      # `db` is the Compose service name, resolved as a hostname on the
+      # project network.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-student_news}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-student}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-student}
     depends_on:
       db:
         condition: service_healthy
@@ -37,7 +49,25 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:80"
+      # The UI stays at http://localhost:5173; nginx inside listens on 8080.
+      - "5173:8080"
+  
+  avatar-service:
+    build: ./avatar-service
+    ports:
+        - "8090:8090"
+    environment:
+        - PORT=8090
+        - UPLOAD_DIR=/data/avatars
+        - MAX_BYTES=2097152
+    volumes:
+        - avatar_data:/data/avatars
+    healthcheck:
+        test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
+        interval: 15s
+        timeout: 5s
+        retries: 3
 
 volumes:
   postgres_data:
+  avatar_data:

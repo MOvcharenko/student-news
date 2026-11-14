@@ -1,0 +1,8 @@
+# Dependencies are installed inside the image by `npm ci` from the lock file.
+# A host node_modules can hold different versions (or macOS-native binaries),
+# and `COPY . .` would copy it over the clean install.
+node_modules/
+dist/
+.vite/
+.git
+*.log

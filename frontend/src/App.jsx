@@ -1,8 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080/api/news";
+// avatar-service (Homework 12). Each post's picture is stored there under news-<id>.
+const AVATAR_URL = import.meta.env.VITE_AVATAR_URL ?? "http://localhost:8090";
 
 const emptyForm = { title: "", content: "" };
+
+const avatarUrl = (newsId) => `${AVATAR_URL}/avatars/news-${newsId}`;
+
+// A post without a picture answers 404; the image then simply hides itself.
+function Avatar({ newsId, version }) {
+  const [missing, setMissing] = useState(false);
+  if (missing) return null;
+  return (
+    <img
+      className="avatar"
+      data-testid={`news-avatar-${newsId}`}
+      src={version ? `${avatarUrl(newsId)}?v=${version}` : avatarUrl(newsId)}
+      alt=""
+      onError={() => setMissing(true)}
+    />
+  );
+}
 
 function App() {
   const [news, setNews] = useState([]);
@@ -11,6 +30,11 @@ function App() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [avatarService, setAvatarService] = useState({ ok: false, detail: "checking..." });
+  const [avatarFile, setAvatarFile] = useState(null);
+  // Bumped after an upload so the browser fetches the new picture.
+  const [avatarVersions, setAvatarVersions] = useState({});
+  const avatarInput = useRef(null);
 
   const endpoint = useMemo(() => {
     if (statusFilter === "ALL") return API_URL;
@@ -32,9 +56,29 @@ function App() {
     }
   };
 
+  // The news works without avatar-service; pictures are only offered when it is healthy.
+  const checkAvatarService = async () => {
+    try {
+      const response = await fetch(`${AVATAR_URL}/health`);
+      const body = await response.json();
+      setAvatarService(response.ok ? { ok: true } : { ok: false, detail: body.detail });
+    } catch {
+      setAvatarService({ ok: false, detail: `avatar-service is not reachable at ${AVATAR_URL}` });
+    }
+  };
+
   useEffect(() => {
     fetchNews();
   }, [endpoint]);
+
+  useEffect(() => {
+    checkAvatarService();
+  }, []);
+
+  const refresh = () => {
+    fetchNews();
+    checkAvatarService();
+  };
 
   const onChange = (event) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
@@ -43,6 +87,26 @@ function App() {
   const resetForm = () => {
     setForm(emptyForm);
     setEditingId(null);
+    setAvatarFile(null);
+    if (avatarInput.current) avatarInput.current.value = "";
+  };
+
+  const uploadAvatar = async (newsId, file) => {
+    const body = new FormData();
+    body.append("file", file);
+    let response;
+    try {
+      response = await fetch(avatarUrl(newsId), { method: "POST", body });
+    } catch {
+      throw new Error(`News saved, but not its picture: avatar-service is not reachable at ${AVATAR_URL}`);
+    }
+    if (!response.ok) {
+      const detail = await response
+        .json()
+        .then((json) => json.detail)
+        .catch(() => `HTTP ${response.status}`);
+      throw new Error(`News saved, but not its picture: ${detail}`);
+    }
   };
 
   const onSubmit = async (event) => {
@@ -60,6 +124,7 @@ function App() {
     const method = editingId ? "PUT" : "POST";
     const url = editingId ? `${API_URL}/${editingId}` : API_URL;
 
+    let saved;
     try {
       const response = await fetch(url, {
         method,
@@ -67,10 +132,23 @@ function App() {
         body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error("Saving failed");
-      resetForm();
-      await fetchNews();
+      saved = await response.json();
     } catch (e) {
       setError(e.message);
+      return;
+    }
+
+    const file = avatarFile;
+    resetForm();
+    await fetchNews();
+    // After fetchNews, which clears the error message, so an upload error stays visible.
+    if (file) {
+      try {
+        await uploadAvatar(saved.id, file);
+        setAvatarVersions((prev) => ({ ...prev, [saved.id]: Date.now() }));
+      } catch (e) {
+        setError(e.message);
+      }
     }
   };
 
@@ -95,6 +173,8 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Delete failed");
+      // Best effort: the post is gone either way, and a 404 only means it had no picture.
+      if (avatarService.ok) fetch(avatarUrl(id), { method: "DELETE" }).catch(() => {});
       await fetchNews();
     } catch (e) {
       setError(e.message);
@@ -124,6 +204,23 @@ function App() {
           onChange={onChange}
           rows={5}
         />
+        <label htmlFor="avatar">
+          Picture (PNG or JPEG, optional{editingId ? ", replaces the current one" : ""})
+        </label>
+        <input
+          id="avatar"
+          type="file"
+          accept="image/png,image/jpeg"
+          data-testid="input-avatar"
+          ref={avatarInput}
+          disabled={!avatarService.ok}
+          onChange={(e) => setAvatarFile(e.target.files[0] ?? null)}
+        />
+        {!avatarService.ok && (
+          <p className="muted" data-testid="avatar-service-status">
+            Pictures are unavailable: {avatarService.detail}
+          </p>
+        )}
         <div className="actions">
           <button type="submit" data-testid="btn-submit">
             {editingId ? "Save changes" : "Create draft"}
@@ -149,7 +246,7 @@ function App() {
           <option value="PUBLISHED">Published</option>
           <option value="ARCHIVED">Archived</option>
         </select>
-        <button type="button" className="secondary" data-testid="btn-refresh" onClick={fetchNews}>
+        <button type="button" className="secondary" data-testid="btn-refresh" onClick={refresh}>
           Refresh
         </button>
       </section>
@@ -161,7 +258,16 @@ function App() {
         {news.map((item) => (
           <article className="card" key={item.id} data-testid={`news-card-${item.id}`}>
             <header className="newsHeader">
-              <h3>{item.title}</h3>
+              <div className="newsTitle">
+                {avatarService.ok && (
+                  <Avatar
+                    key={avatarVersions[item.id] ?? 0}
+                    newsId={item.id}
+                    version={avatarVersions[item.id]}
+                  />
+                )}
+                <h3>{item.title}</h3>
+              </div>
               <span className={`status ${item.status.toLowerCase()}`} data-testid={`news-status-${item.id}`}>
                 {item.status}
               </span>

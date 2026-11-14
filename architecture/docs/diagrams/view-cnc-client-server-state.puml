@@ -1,0 +1,23 @@
+@startuml view-cnc-client-server-state
+!include plantuml-theme.puml
+title NewsItem status lifecycle (UML state machine)
+state DRAFT
+state PUBLISHED
+state ARCHIVED
+[*] --> DRAFT : POST /api/news (UC-1)
+DRAFT --> PUBLISHED : PATCH .../publish (UC-4)
+DRAFT --> ARCHIVED : PATCH .../archive (UC-4)
+PUBLISHED --> ARCHIVED : PATCH .../archive (UC-4)
+ARCHIVED --> PUBLISHED : PATCH .../publish (UC-4)
+DRAFT --> [*] : DELETE (UC-5)
+PUBLISHED --> [*] : DELETE (UC-5)
+ARCHIVED --> [*] : DELETE (UC-5)
+DRAFT : PUT edits title and content (UC-3)
+PUBLISHED : PUT edits title and content (UC-3)
+ARCHIVED : PUT edits title and content (UC-3)
+note right of ARCHIVED #F6E4E4
+  Open question: the API rejects no
+  transition, so an archived item
+  can be published again.
+end note
+@enduml

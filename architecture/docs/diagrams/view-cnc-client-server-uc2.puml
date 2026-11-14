@@ -1,0 +1,28 @@
+@startuml view-cnc-client-server-uc2
+!include plantuml-theme.puml
+title UC-2 Browse and filter news — read path (UML sequence diagram)
+autonumber
+actor "Demo user" as user
+participant "Web UI\n(React SPA)" as spa
+participant "NewsController" as ctl
+participant "NewsService" as svc
+participant "NewsRepository\n(Spring Data JPA)" as repo
+database "PostgreSQL 16" as db
+user -> spa : open the page, or pick a status filter
+spa --> user : show "Loading..."
+spa -> ctl : GET /api/news?status=PUBLISHED\n(no status parameter for All)
+ctl -> svc : list(status)
+alt status given
+  svc -> repo : findAllByStatusOrderByUpdatedAtDesc(status)
+  repo -> db : SELECT ... WHERE status = ? ORDER BY updated_at DESC
+else All
+  svc -> repo : findAll()
+  repo -> db : SELECT ... FROM news_items
+end
+db --> repo : rows
+repo --> svc : List<NewsItem>
+svc -> svc : sort by updatedAt, newest first
+svc --> ctl : List<NewsResponse>
+ctl --> spa : 200 OK, JSON array
+spa --> user : one card per item
+@enduml

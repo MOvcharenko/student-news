@@ -1,0 +1,32 @@
+@startuml view-allocation-ci
+!include plantuml-theme.puml
+title CI — which job checks what, on which runner (UML activity diagram)
+start
+:Push or pull request to main;
+fork
+  partition "ci.yml (GitHub-hosted Ubuntu runners)" {
+    fork
+      :Frontend lint\n(Node 22, ESLint);
+    fork again
+      :Backend unit tests\n(Temurin 27, Maven, Mockito);
+    fork again
+      :Backend integration tests\n(Temurin 27, Testcontainers\nPostgreSQL 16);
+    fork again
+      :Frontend build\n(Node 22, Vite);
+    end fork
+    if (all four jobs green?) then (yes)
+      :Package backend and frontend images\n(Docker Buildx, not pushed);
+    else (no)
+      :Packaging skipped;
+    endif
+    :CI status\n(the one required check,\nred if any job failed);
+  }
+fork again
+  partition "e2e.yml" {
+    :docker compose up --build\n(GitHub-hosted Ubuntu runner);
+    :Playwright E2E tests\n(Chromium);
+    :docker compose down -v;
+  }
+end fork
+stop
+@enduml

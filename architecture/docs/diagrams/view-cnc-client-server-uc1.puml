@@ -1,0 +1,32 @@
+@startuml view-cnc-client-server-uc1
+!include plantuml-theme.puml
+title UC-1 Create a news draft — write path with validation (UML sequence diagram)
+autonumber
+actor "Demo user" as user
+participant "Web UI\n(React SPA)" as spa
+participant "NewsController" as ctl
+participant "NewsService" as svc
+participant "NewsRepository\n(Spring Data JPA)" as repo
+database "PostgreSQL 16" as db
+user -> spa : enter title and content, click Create draft
+alt title or content empty after trimming
+  spa --> user : show "Title and content are required"
+else both present
+  spa -> ctl : POST /api/news {title, content}
+  alt Bean Validation fails (blank, or title over 255 characters)
+    ctl --> spa : 400 Bad Request
+    spa --> user : show "Saving failed"
+  else request valid
+    ctl -> svc : create(request)
+    svc -> repo : save(NewsItem with trimmed text, status DRAFT)
+    repo -> db : INSERT INTO news_items
+    db --> repo : generated id
+    repo --> svc : NewsItem (createdAt = updatedAt = now)
+    svc --> ctl : NewsResponse
+    ctl --> spa : 201 Created with NewsResponse
+    spa -> ctl : GET /api/news (reload the list, UC-2 path)
+    ctl --> spa : 200 OK, newest first
+    spa --> user : new card with status DRAFT
+  end
+end
+@enduml

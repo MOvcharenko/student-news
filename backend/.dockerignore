@@ -1,0 +1,8 @@
+# The image is built from pom.xml and src/ only. Local build output, IDE files
+# and logs are either rebuilt inside the image or have no business in it.
+target/
+.idea/
+*.iml
+.git
+logs/
+*.log

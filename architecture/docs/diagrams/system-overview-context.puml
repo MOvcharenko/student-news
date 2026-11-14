@@ -1,0 +1,14 @@
+@startuml system-overview-context
+!include plantuml-theme.puml
+left to right direction
+title Context — Student News and the systems around it (UML component diagram)
+actor "Demo user" as user
+actor "API developer" as dev
+component "Student News\n(web UI, REST API, database)" <<system>> as sys
+rectangle "GitHub Actions\n(CI/CD service)" <<external>> as gha
+rectangle "Docker Hub\n(image registry)" <<external>> as hub
+user --> sys : creates, edits, publishes\nand deletes news (browser)
+dev --> sys : reads OpenAPI docs and calls\nthe REST API (HTTP, JSON)
+gha --> sys : builds, tests and packages\nevery pushed change
+sys --> hub : pulls base images (Node, nginx,\nTemurin, Maven, PostgreSQL)
+@enduml

@@ -1,0 +1,22 @@
+@startuml system-overview-use-cases
+!include plantuml-theme.puml
+skinparam actorStyle awesome
+left to right direction
+title Use cases — Student News (UC-1 to UC-6)
+actor "Demo user" as user
+actor "API developer" as dev
+rectangle "Student News" {
+  usecase "UC-1\nCreate a news draft" as uc1
+  usecase "UC-5\nDelete a news item" as uc5
+  usecase "UC-4\nPublish or archive\na news item" as uc4
+  usecase "UC-3\nEdit a news item" as uc3
+  usecase "UC-2\nBrowse and filter news" as uc2
+  usecase "UC-6\nExplore the API\n(Swagger UI / OpenAPI)" as uc6
+}
+user -- uc5
+user -- uc4
+user -- uc3
+user -- uc2
+user -- uc1
+dev -- uc6
+@enduml

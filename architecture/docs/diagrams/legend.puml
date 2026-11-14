@@ -1,0 +1,15 @@
+@startuml legend
+!include plantuml-theme.puml
+hide stereotype
+left to right direction
+title Legend — what colour adds to the standard UML notation
+rectangle "Person / role\n(actor)" as P #E7E3F3
+rectangle "Element owned by\nStudent News" as I #EDF2F8
+rectangle "Execution environment\nor external system" as E #F5EEE3
+rectangle "Datastore" as D #E4F0E9
+rectangle "Risk or open question" as R #F6E4E4
+P -[hidden]- I
+I -[hidden]- E
+E -[hidden]- D
+D -[hidden]- R
+@enduml

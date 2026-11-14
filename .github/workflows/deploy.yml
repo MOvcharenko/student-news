@@ -35,10 +35,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Inputs reach scripts as environment variables, never pasted into them
+      # with ${{ }}. Pasted in, a tag such as $(id) would run as a command.
       - name: Resolve image tag
         id: resolve
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
-          TAG="${{ inputs.image_tag }}"
+          TAG="$IMAGE_TAG"
           [ -z "$TAG" ] && TAG="${GITHUB_SHA::7}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Would deploy tag: $TAG"
@@ -47,9 +51,11 @@ jobs:
       # check exists to prevent. In a real pipeline this would query the
       # deployment API or require a protected environment reviewer.
       - name: Confirm CI passed for this commit
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
         run: |
           echo "Commit:      $GITHUB_SHA"
-          echo "Environment: ${{ inputs.environment }}"
+          echo "Environment: $TARGET_ENV"
           echo
           echo "In a real pipeline this step would refuse to continue unless"
           echo "the CI workflow for this exact commit finished successfully."
@@ -63,11 +69,14 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - name: Show what a deployment would do
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+          IMAGE_TAG: ${{ needs.plan.outputs.tag }}
         run: |
           echo "=== DRY RUN — nothing is actually deployed ==="
           echo
-          echo "Target:    ${{ inputs.environment }}"
-          echo "Image tag: ${{ needs.plan.outputs.tag }}"
+          echo "Target:    $TARGET_ENV"
+          echo "Image tag: $IMAGE_TAG"
           echo
           echo "A real deployment at this point would:"
           echo "  1. push student-news-backend and student-news-frontend to a registry"

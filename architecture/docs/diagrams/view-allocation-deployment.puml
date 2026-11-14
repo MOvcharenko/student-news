@@ -1,0 +1,23 @@
+@startuml view-allocation-deployment
+!include plantuml-theme.puml
+title Deployment — Docker Compose stack on one host (UML deployment diagram)
+node "Web browser\n(on the host)" as browser
+node "IDE or database client\n(optional, local development)" as ide
+node "Developer laptop or CI runner\n(Docker Engine 29, Compose project student-news)" as host {
+  node "frontend container\nnginxinc/nginx-unprivileged:1.31-alpine\nuid 101, listens on 8080" <<container>> as fe {
+    artifact "dist/\n(built SPA)" as dist
+  }
+  node "backend container\neclipse-temurin:27-jre-alpine\nuid 10001, listens on 8080" <<container>> as be {
+    artifact "app.jar\n(News API + Flyway)" as jar
+  }
+  node "db container\npostgres:16-alpine\nlistens on 5432" <<container>> as dbc {
+    database "student_news" as db
+  }
+  storage "postgres_data\n(named volume)" as vol
+}
+browser --> fe : HTTP localhost:5173 -> 8080
+browser --> be : HTTP localhost:8080 (REST, CORS)
+be --> dbc : JDBC db:5432\n(service name resolved by Compose DNS)
+dbc --> vol : stores /var/lib/postgresql/data
+ide --> dbc : 127.0.0.1:5432 only
+@enduml

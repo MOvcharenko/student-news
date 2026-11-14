@@ -77,6 +77,22 @@ button.danger {
   gap: 8px;
 }
 
+.newsTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e5e7eb;
+}
+
 .status {
   font-size: 12px;
   font-weight: bold;

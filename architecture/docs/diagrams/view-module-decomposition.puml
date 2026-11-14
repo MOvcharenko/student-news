@@ -1,0 +1,35 @@
+@startuml view-module-decomposition
+!include plantuml-theme.puml
+title Decomposition — student-news repository (UML package diagram)
+package "student-news (Git repository)" {
+  package "backend <<Maven module>>" as backend {
+    package "com.example.studentnews" as app {
+      label "Java 27, Spring Boot 4:\ncontroller, service, repository,\nentity, dto, config, exception" as app_l
+    }
+    package "db/migration" as mig {
+      label "Flyway SQL scripts" as mig_l
+    }
+    package "src/test" as tests {
+      label "JUnit 5, Mockito,\nTestcontainers" as tests_l
+    }
+  }
+  package "frontend <<npm package>>" as frontend {
+    package "src" as fe_src {
+      label "React 19, Vite 8:\nApp.jsx, main.jsx" as fe_l
+    }
+  }
+  package "e2e <<npm package>>" as e2e {
+    label "Playwright, TypeScript" as e2e_l
+  }
+  package ".github" as gh {
+    label "GitHub Actions workflows,\nDependabot" as gh_l
+  }
+  artifact "docker-compose.yml\n.env.example" as compose
+}
+app -[hidden]right- mig
+mig -[hidden]right- tests
+backend -[hidden]down- frontend
+frontend -[hidden]right- e2e
+e2e -[hidden]right- gh
+gh -[hidden]right- compose
+@enduml

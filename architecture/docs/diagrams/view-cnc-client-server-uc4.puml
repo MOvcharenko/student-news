@@ -1,0 +1,33 @@
+@startuml view-cnc-client-server-uc4
+!include plantuml-theme.puml
+title UC-4 Publish or archive a news item — status change (UML sequence diagram)
+autonumber
+actor "Demo user" as user
+participant "Web UI\n(React SPA)" as spa
+participant "NewsController" as ctl
+participant "NewsService" as svc
+participant "NewsRepository\n(Spring Data JPA)" as repo
+database "PostgreSQL 16" as db
+user -> spa : click Publish (or Archive) on a card
+spa -> ctl : PATCH /api/news/{id}/publish
+ctl -> svc : publish(id)
+svc -> repo : findById(id)
+repo -> db : SELECT ... WHERE id = ?
+alt no such id
+  db --> repo : no row
+  repo --> svc : empty Optional
+  svc --> ctl : NotFoundException
+  ctl --> spa : 404 Not Found {"error": "News with id ... not found"}
+  spa --> user : show "Status update failed"
+else item exists
+  db --> repo : row
+  repo --> svc : NewsItem
+  svc -> svc : setStatus(PUBLISHED)
+  svc -> repo : save(item)
+  repo -> db : UPDATE news_items (updated_at set by @PreUpdate)
+  svc --> ctl : NewsResponse
+  ctl --> spa : 200 OK with NewsResponse
+  spa -> ctl : GET /api/news (reload the list, UC-2 path)
+  spa --> user : status badge PUBLISHED, Publish button hidden
+end
+@enduml
