@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.2</version>
+        <version>3.2.0</version>
         <relativePath/>
     </parent>
 
@@ -15,7 +15,7 @@
     <description>Demo student news API</description>
 
     <properties>
-        <java.version>27</java.version>
+        <java.version>21</java.version>
     </properties>
 
     <dependencies>
