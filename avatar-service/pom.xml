@@ -17,7 +17,7 @@
     <description>Stores one avatar image per news post on disk</description>
 
     <properties>
-        <java.version>27</java.version>
+        <java.version>21</java.version>
     </properties>
 
     <dependencies>
