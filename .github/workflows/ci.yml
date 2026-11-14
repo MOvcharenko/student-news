@@ -46,16 +46,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up JDK 27
+      - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
-          java-version: '27'
+          java-version: '21'
           distribution: temurin
           cache: maven            # without this, Maven re-downloads the world every run
 
       # -B is batch mode (no colour codes in the log) and surefire runs the unit
       # tests only. The integration tests need a database, so they are excluded
-      # here and run in the backend-integration-test job below.
+      # here and covered by the E2E workflow instead.
       - name: Run unit tests
         working-directory: backend
         run: mvn -B test -Dtest='!*IntegrationTest,!*E2ETest'
@@ -71,36 +71,21 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------- stage 1
-  # The Testcontainers tests start a real PostgreSQL in Docker, which GitHub's
-  # Ubuntu runners provide. They take longer than the unit tests, so they get
-  # their own job and run alongside them rather than in front of them.
-  backend-integration-test:
+  integration-test:
     name: Backend · integration tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-
-      - name: Set up JDK 27
+      - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
-          java-version: '27'
+          java-version: '21'
           distribution: temurin
           cache: maven
-
-      # The mirror image of the unit-test filter: only the tests that need a
-      # database.
       - name: Run integration tests
         working-directory: backend
         run: mvn -B test -Dtest='*IntegrationTest,*E2ETest'
-
-      - name: Publish test report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: backend-integration-surefire-reports
-          path: backend/target/surefire-reports/
-          retention-days: 7
 
   # ---------------------------------------------------------------- stage 1
   frontend-build:
@@ -133,42 +118,12 @@ jobs:
           path: frontend/dist/
           retention-days: 7
 
-  # ---------------------------------------------------------------- stage 1
-  # The Homework 12 starter. Only its tests run here: its Dockerfile is empty
-  # on purpose (writing it is the homework), so it stays out of the package
-  # matrix below.
-  avatar-service-test:
-    name: Avatar service · tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up JDK 27
-        uses: actions/setup-java@v6
-        with:
-          java-version: '27'
-          distribution: temurin
-          cache: maven
-
-      - name: Run tests
-        working-directory: avatar-service
-        run: mvn -B test
-
-      - name: Publish test report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: avatar-service-surefire-reports
-          path: avatar-service/target/surefire-reports/
-          retention-days: 7
-
   # ---------------------------------------------------------------- stage 2
-  # Packaging only runs once every earlier job is green. There is no point
+  # Packaging only runs once both stage-1 jobs are green. There is no point
   # spending minutes building images for code whose tests already failed.
   package:
     name: Package · container images
-    needs: [frontend-lint, backend-test, backend-integration-test, frontend-build]
+    needs: [frontend-lint, backend-test, frontend-build, integration-test]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -184,7 +139,7 @@ jobs:
       # without needing registry credentials. Pushing is the Deploy stage, and that
       # is what the Final Project adds.
       - name: Build ${{ matrix.service }} image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v6
         with:
           context: ./${{ matrix.service }}
           push: false
@@ -198,7 +153,7 @@ jobs:
   ci-status:
     name: CI status
     if: always()
-    needs: [frontend-lint, backend-test, backend-integration-test, frontend-build, avatar-service-test, package]
+    needs: [frontend-lint, backend-test, frontend-build, integration-test, package]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any stage failed

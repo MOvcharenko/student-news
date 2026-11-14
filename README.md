@@ -1,3 +1,5 @@
+Checking for selectiveness
+
 # Student News Demo
 
 [![CI](https://github.com/rtym/student-news/actions/workflows/ci.yml/badge.svg)](https://github.com/rtym/student-news/actions/workflows/ci.yml)
