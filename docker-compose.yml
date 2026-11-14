@@ -16,7 +16,7 @@ services:
       # (the default in application.properties), as can a database client.
       # Bound to 127.0.0.1 so the demo credentials are not reachable from the
       # network.
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432" #different port here to avoid conflict on my device
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -51,6 +51,23 @@ services:
     ports:
       # The UI stays at http://localhost:5173; nginx inside listens on 8080.
       - "5173:8080"
+  
+  avatar-service:
+    build: ./avatar-service
+    ports:
+        - "8090:8090"
+    environment:
+        - PORT=8090
+        - UPLOAD_DIR=/data/avatars
+        - MAX_BYTES=2097152
+    volumes:
+        - avatar_data:/data/avatars
+    healthcheck:
+        test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
+        interval: 15s
+        timeout: 5s
+        retries: 3
 
 volumes:
   postgres_data:
+  avatar_data:
